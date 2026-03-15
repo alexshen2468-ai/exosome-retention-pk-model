@@ -32,7 +32,7 @@ R = \frac{k_{bind}}{k_{rel}}
 
 which represents the effective balance between tissue binding/uptake kinetics and release or clearance dynamics.
 
-This simplified framework allows exploration of how retention processes influence organ accumulation and pharmacological duration.
+This simplified framework enables exploration of how retention processes influence organ accumulation and pharmacological duration.
 
 ---
 
@@ -47,12 +47,7 @@ Retention Ratio PLOSONE v4 revised.docx
 
 **exosome_pk_model.py**
 
-Python implementation of the pharmacokinetic model including:
-
-- ODE-based simulation
-- parameter estimation
-- sensitivity analysis
-- retention-dynamics exploration
+Main simulation script implementing the pharmacokinetic model.
 
 **Retention Ratio PLOSONE v4 revised.docx**
 
@@ -90,14 +85,38 @@ acts as a simplified descriptor of tissue-level retention behavior.
 
 # Computational Methods
 
-Simulations in this repository include:
+Simulations include:
 
 - ordinary differential equation (ODE) modeling
 - nonlinear parameter estimation
 - sensitivity analysis
-- retention-dynamics simulations
+- retention-dynamics exploration
 
 All simulations were implemented in **Python**.
+
+---
+
+# Installation
+
+Python 3.x is required.
+
+Install required packages:
+pip install numpy scipy matplotlib
+---
+
+# Running the Model
+
+Run the simulation script:
+python exosome_pk_model.py
+The script performs pharmacokinetic simulations and generates retention-dynamics analysis.
+
+---
+
+# Reproducibility
+
+The repository provides the full computational implementation used in the associated preprint.
+
+Researchers can reproduce the simulations by running the provided Python script using the specified dependencies.
 
 ---
 
@@ -105,14 +124,16 @@ All simulations were implemented in **Python**.
 
 The retention-ratio parameter represents the effective balance between tissue binding/uptake processes and release or clearance dynamics.
 
-Biologically, this parameter may capture several mechanisms known to influence exosome biodistribution, including:
+Biologically, this parameter may capture mechanisms known to influence exosome biodistribution, including:
 
 - membrane adhesion interactions
 - receptor-mediated cellular uptake
 - extracellular matrix trapping
 - intracellular processing or degradation pathways
 
-Experimental studies have shown that exosome accumulation in organs such as the liver and spleen is strongly influenced by these interactions. The retention-ratio framework therefore provides a simplified mechanistic representation of these combined biological processes.
+Experimental studies have shown that exosome accumulation in organs such as the liver and spleen is strongly influenced by these interactions.
+
+The retention-ratio framework therefore provides a simplified mechanistic representation of these combined biological processes.
 
 ---
 
