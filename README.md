@@ -42,7 +42,6 @@ exosome-retention-pk-model
 | File | Description |
 |----|----|
 | exosome-pk-model.py | Python implementation of the PK simulation model |
-| Model-generated simulation figures |
 | Python Exosome Pk Model v4.pdf | Technical description of the computational model |
 | Retention Ratio PLOSONE v4 revised.docx | Manuscript describing the retention ratio framework |
 | LICENSE | Open-source license |
