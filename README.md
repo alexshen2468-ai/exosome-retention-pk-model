@@ -1,132 +1,166 @@
 # Exosome Retention PK Model
 
-Mechanistic pharmacokinetic model for exosome retention dynamics based on **retention ratio theory**.
+![DOI](https://img.shields.io/badge/DOI-10.21203%2Frs.3.rs--7939584%2Fv1-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Python](https://img.shields.io/badge/python-3.x-blue)
+![Status](https://img.shields.io/badge/status-research%20prototype-orange)
 
-This repository provides the computational implementation, simulation results, and manuscript associated with the study:
+Version: v1.0 (March 2026)
 
-**Simulation-Based Exosome Nanocarrier Model for Targeted Opioid Analgesia**
+This repository contains the computational implementation of a mechanistic pharmacokinetic (PK) model designed to investigate **exosome biodistribution and tissue retention dynamics**.
 
-Preprint available on Research Square:  
-https://doi.org/10.21203/rs.3.rs-7939584/v1
+The model introduces a **retention-ratio framework** describing the balance between tissue binding/uptake and release processes, offering a simplified mechanistic explanation for prolonged organ accumulation observed in experimental exosome studies.
 
 ---
 
 # Overview
 
-Exosomes are increasingly investigated as nanocarriers for targeted drug delivery.  
-However, quantitative modeling of **retention vs clearance dynamics** remains limited.
+Extracellular vesicles (exosomes) are increasingly studied as drug delivery vehicles due to their biocompatibility, intrinsic targeting capability, and ability to transport therapeutic molecules.
 
-This project introduces a **retention ratio–based pharmacokinetic framework** that models how binding and release dynamics influence sustained accumulation of exosome carriers in biological tissues.
+However, experimental biodistribution studies frequently report a discrepancy between:
 
-The computational model integrates:
+- rapid systemic clearance from circulation
+- prolonged retention in organs such as the liver and spleen
 
-- ODE-based pharmacokinetic modeling
-- parameter estimation
-- global sensitivity analysis
-- uncertainty quantification
-- cross-dataset validation
+Traditional pharmacokinetic models typically describe systemic decay but often lack explicit mechanisms explaining **tissue retention dynamics**.
+
+To address this, the present model introduces a **retention ratio parameter**
+
+\[
+R = \frac{k_{bind}}{k_{rel}}
+\]
+
+which represents the effective balance between tissue binding/uptake kinetics and release or clearance dynamics.
+
+This simplified framework allows exploration of how retention processes influence organ accumulation and pharmacological duration.
 
 ---
 
 # Repository Structure
 exosome-retention-pk-model
 │
-├ README.md
-├ LICENSE
-├ exosome-pk-model.py
-├ Python Exosome Pk Model v4.pdf
-└ Retention Ratio PLOSONE v4 revised.docx
+README.md
+LICENSE
+CITATION.cff
+exosome_pk_model.py
+Retention Ratio PLOSONE v4 revised.docx
 
-**File descriptions**
+**exosome_pk_model.py**
 
-| File | Description |
-|----|----|
-| exosome-pk-model.py | Python implementation of the PK simulation model |
-| Python Exosome Pk Model v4.pdf | Technical description of the computational model |
-| Retention Ratio PLOSONE v4 revised.docx | Manuscript describing the retention ratio framework |
-| LICENSE | Open-source license |
+Python implementation of the pharmacokinetic model including:
 
----
+- ODE-based simulation
+- parameter estimation
+- sensitivity analysis
+- retention-dynamics exploration
 
-# Methods
+**Retention Ratio PLOSONE v4 revised.docx**
 
-The computational workflow includes:
+Manuscript describing the modeling framework and computational analysis.
 
-- ODE-based pharmacokinetic modeling
-- parameter fitting
-- Sobol global sensitivity analysis
-- bootstrap uncertainty analysis
-- cross-dataset validation
+**CITATION.cff**
 
-The retention ratio framework describes the balance between:
-
-**binding dynamics vs release kinetics** governing sustained tissue accumulation of exosome carriers.
+Machine-readable citation file enabling automatic citation generation on GitHub.
 
 ---
 
-# Usage
+# Model Description
 
-To reproduce the pharmacokinetic simulation:
-python3 exosome-pk-model.py
+The model implements a mechanistic PK structure including:
+
+- systemic circulation compartment
+- organ distribution
+- reversible tissue binding dynamics
+
+Key kinetic processes include:
+
+- systemic clearance
+- blood–organ exchange
+- reversible tissue binding
+
+The **retention ratio**
+
+\[
+R = k_{bind}/k_{rel}
+\]
+
+acts as a simplified descriptor of tissue-level retention behavior.
 
 ---
 
-# Requirements
+# Computational Methods
 
-Recommended environment:
+Simulations in this repository include:
 
-Python 3.9+
-numpy
-scipy
-matplotlib
-pandas
-SALib
+- ordinary differential equation (ODE) modeling
+- nonlinear parameter estimation
+- sensitivity analysis
+- retention-dynamics simulations
 
-Install dependencies:
-
-pip install numpy scipy matplotlib pandas SALib
+All simulations were implemented in **Python**.
 
 ---
 
-# Scientific Context
+# Biological Interpretation
 
-This project contributes to research in:
+The retention-ratio parameter represents the effective balance between tissue binding/uptake processes and release or clearance dynamics.
 
-- exosome engineering
-- nanomedicine pharmacokinetics
-- targeted drug delivery systems
-- computational biotechnology
+Biologically, this parameter may capture several mechanisms known to influence exosome biodistribution, including:
 
-The retention ratio model aims to provide a **conceptual and computational framework** for analyzing the pharmacokinetics of engineered extracellular vesicle systems.
+- membrane adhesion interactions
+- receptor-mediated cellular uptake
+- extracellular matrix trapping
+- intracellular processing or degradation pathways
+
+Experimental studies have shown that exosome accumulation in organs such as the liver and spleen is strongly influenced by these interactions. The retention-ratio framework therefore provides a simplified mechanistic representation of these combined biological processes.
+
+---
+
+# Preprint
+
+The full manuscript describing this model is available as a preprint:
+
+Shen, Z. (2026)  
+**Simulation-Based Exosome Nanocarrier Model for Targeted Opioid Analgesia**  
+Research Square
+
+DOI  
+https://doi.org/10.21203/rs.3.rs-7939584/v1
+
+---
+
+# Citation
+
+If you use this repository or model in academic work, please cite:
+
+Shen, Z. (2026)  
+Simulation-Based Exosome Nanocarrier Model for Targeted Opioid Analgesia  
+Research Square preprint  
+https://doi.org/10.21203/rs.3.rs-7939584/v1
+
+This repository also includes a machine-readable citation file (`CITATION.cff`).
+
+---
+
+# Code Availability
+
+The computational implementation used in this study is publicly available in this repository.
 
 ---
 
 # Author
 
-**Zhuofan Shen**
-
-Research focus:
-
-- exosome engineering
-- computational biotechnology
-- nanocarrier pharmacokinetics
+Zhuofan Shen  
 
 ORCID  
 https://orcid.org/0009-0005-4304-8391
 
 ---
 
-# Citation
+# License
 
-If you use this code or model, please cite:
-
-Shen Z.  
-Simulation-Based Exosome Nanocarrier Model for Targeted Opioid Analgesia.  
-Research Square Preprint.  
-https://doi.org/10.21203/rs.3.rs-7939584/v1
+This project is released under the **MIT License**.
 
 ---
 
-# License
-
-This project is released under the MIT License.
+Maintained as part of ongoing research in exosome pharmacokinetics and computational nanomedicine.
