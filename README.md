@@ -9,6 +9,23 @@ Mechanistic pharmacokinetic model for exosome retention dynamics based on retent
 
 ---
 
+## Quick Start 🚀
+
+Run the model in seconds:
+
+```bash
+pip install numpy scipy matplotlib
+python exosome-pk-model.py
+```
+
+This will generate:
+
+- time-course simulation of exosome distribution  
+- retention vs clearance dynamics  
+- parameter sensitivity analysis  
+
+---
+
 ## Research Identity
 
 This repository is maintained by **Zhuofan Shen**, an undergraduate researcher in biotechnology focusing on **computational modeling of exosome-mediated drug delivery systems**, with emphasis on retention, biodistribution, and pharmacokinetics.
@@ -19,107 +36,140 @@ This repository is maintained by **Zhuofan Shen**, an undergraduate researcher i
 
 ---
 
-## Quick Start 🚀
+## Overview
 
-Run the model in seconds:
+Extracellular vesicles (exosomes) are widely studied as drug delivery vehicles due to their:
 
-```bash
-pip install numpy scipy matplotlib
-python exosome_pk_model.py
-This will generate:
-	•	time-course simulation of exosome distribution
-	•	retention vs clearance dynamics
-	•	parameter sensitivity analysis
+- biocompatibility  
+- intrinsic targeting capability  
+- ability to transport therapeutic molecules  
 
-What This Model Does
+However, experimental studies often report a mismatch:
 
-This model provides a simplified computational framework to study exosome retention behavior in biological systems.
+- rapid systemic clearance  
+- prolonged organ retention (e.g., liver, spleen)  
 
-It explains the commonly observed phenomenon:
-	•	rapid clearance from circulation
-	•	prolonged retention in organs (e.g., liver, spleen)
+Traditional PK models capture clearance but often lack explicit mechanisms for **tissue retention dynamics**.
 
-The model introduces a key parameter:
+---
+
+## What This Model Introduces
+
+This model introduces a key parameter:
+
+```text
 R = k_bind / k_rel
-which represents the balance between:
-	•	tissue binding / uptake
-	•	release / clearance
+```
 
-Model Structure
+which represents the balance between:
+
+- tissue binding / uptake  
+- release / clearance  
+
+This enables mechanistic exploration of retention-driven biodistribution behavior.
+
+---
+
+## Model Structure
 
 The pharmacokinetic (PK) model includes:
-	•	systemic circulation compartment
-	•	organ distribution
-	•	reversible tissue binding
+
+- systemic circulation compartment  
+- organ distribution  
+- reversible tissue binding dynamics  
 
 Key processes:
-	•	systemic clearance
-	•	blood–organ exchange
-	•	reversible binding
 
-Example Use Cases
-	•	studying exosome biodistribution
-	•	testing retention hypotheses
-	•	early-stage drug delivery modeling
-	•	conceptual PK/PD exploration
+- systemic clearance  
+- blood–organ exchange  
+- reversible binding  
 
-Computational Approach
-	•	ordinary differential equation (ODE) modeling
-	•	nonlinear parameter estimation
-	•	sensitivity analysis
-	•	simulation-based exploration
+---
 
-Implemented entirely in Python.
+## Example Use Cases
 
-Reproducibility
+- studying exosome biodistribution  
+- testing retention hypotheses  
+- early-stage drug delivery modeling  
+- conceptual PK/PD exploration  
 
-This repository contains the full computational implementation used in the associated preprint.
+---
 
-All results can be reproduced using the provided script and dependencies.
+## Computational Methods
 
-Preprint
+- ordinary differential equation (ODE) modeling  
+- nonlinear parameter estimation  
+- sensitivity analysis  
+- simulation-based exploration  
 
-Shen, Z. (2026)
-Simulation-Based Exosome Nanocarrier Model for Targeted Opioid Analgesia
-Research Square
+All simulations are implemented in Python.
 
-https://doi.org/10.21203/rs.3.rs-7939584/v1
+---
 
-Citation
+## Reproducibility
+
+This repository provides the full computational implementation used in the associated preprint.
+
+All simulations can be reproduced using the provided script and dependencies.
+
+---
+
+## Repository Structure
+
+```text
+exosome-pk-model.py                  # Main simulation script
+README.md                            # Documentation
+LICENSE                              # MIT license
+Retention Ratio PLOSONE v4 revised.docx   # Manuscript draft
+```
+
+---
+
+## Preprint
+
+Shen, Z. (2026)  
+**Simulation-Based Exosome Nanocarrier Model for Targeted Opioid Analgesia**  
+Research Square  
+
+https://doi.org/10.21203/rs.3.rs-7939584/v1  
+
+---
+
+## Citation
 
 If you use this repository, please cite:
 
-Shen, Z. (2026)
-Simulation-Based Exosome Nanocarrier Model for Targeted Opioid Analgesia
-Research Square
+Shen, Z. (2026)  
+Simulation-Based Exosome Nanocarrier Model for Targeted Opioid Analgesia  
+Research Square  
 
-https://doi.org/10.21203/rs.3.rs-7939584/v1
+https://doi.org/10.21203/rs.3.rs-7939584/v1  
 
-Repository Structure
-exosome_pk_model.py                  # Main simulation script
-README.md                            # Documentation
-LICENSE                              # MIT license
-CITATION.cff                         # Citation metadata
-Retention Ratio PLOSONE v4 revised.docx   # Manuscript draft
+---
 
-Author
+## Author
 
-Zhuofan Shen
-Undergraduate researcher in biotechnology
+**Zhuofan Shen**  
+Undergraduate researcher in biotechnology  
 
 Research focus:
-	•	computational modeling of exosome-mediated drug delivery
-	•	retention dynamics and biodistribution
-	•	pharmacokinetic (PK/PD) modeling
+- computational modeling of exosome-mediated drug delivery  
+- retention dynamics and biodistribution  
+- pharmacokinetic (PK/PD) modeling  
 
-Affiliation: University of Debrecen
-	•	ORCID: https://orcid.org/0009-0005-4304-8391
-	•	GitHub: https://github.com/alexshen2468-ai
+Affiliation: University of Debrecen  
 
-Keywords
+- ORCID: https://orcid.org/0009-0005-4304-8391  
+- GitHub: https://github.com/alexshen2468-ai  
+
+---
+
+## Keywords
 
 exosome · pharmacokinetics · drug delivery · nanomedicine · computational biology · PK modeling · biodistribution
 
-License
+---
+
+## License
 
 MIT License
