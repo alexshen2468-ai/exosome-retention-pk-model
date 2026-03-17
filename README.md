@@ -176,7 +176,7 @@ The computational implementation used in this study is publicly available in thi
 
 ---
 
-Author
+Author：
 
 Zhuofan Shen
 Undergraduate researcher in biotechnology
