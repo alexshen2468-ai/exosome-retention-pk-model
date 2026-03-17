@@ -5,13 +5,20 @@
 ![Python](https://img.shields.io/badge/python-3.x-blue)
 ![Status](https://img.shields.io/badge/status-research%20prototype-orange)
 
-Version: v1.0 (March 2026)
-
-This repository contains the computational implementation of a mechanistic pharmacokinetic (PK) model designed to investigate **exosome biodistribution and tissue retention dynamics**.
-
-The model introduces a **retention-ratio framework** describing the balance between tissue binding/uptake and release processes, offering a simplified mechanistic explanation for prolonged organ accumulation observed in experimental exosome studies.
+Mechanistic pharmacokinetic model for exosome retention dynamics based on retention-ratio theory.
 
 ---
+
+## Research Identity
+
+This repository is maintained by **Zhuofan Shen**, an undergraduate researcher in biotechnology focusing on **computational modeling of exosome-mediated drug delivery systems**, with an emphasis on retention, biodistribution, and pharmacokinetics.
+
+This project represents ongoing work in computational nanomedicine and exosome pharmacokinetics modeling.
+
+- ORCID: https://orcid.org/0009-0005-4304-8391  
+- Preprint (Research Square): https://doi.org/10.21203/rs.3.rs-7939584/v1  
+- GitHub Profile: https://github.com/alexshen2468-ai  
+
 
 # Overview
 
@@ -169,14 +176,18 @@ The computational implementation used in this study is publicly available in thi
 
 ---
 
-# Author
+Author
 
-Zhuofan Shen  
+Zhuofan Shen
+Undergraduate researcher in biotechnology
 
-ORCID  
-https://orcid.org/0009-0005-4304-8391
+Research focus:
+	•	Computational modeling of exosome-mediated drug delivery
+	•	Retention dynamics and biodistribution
+	•	Pharmacokinetic (PK/PD) modeling
+	•	ORCID: https://orcid.org/0009-0005-4304-8391
+	•	GitHub: https://github.com/alexshen2468-ai
 
----
 
 # License
 
