@@ -173,3 +173,8 @@ exosome · pharmacokinetics · drug delivery · nanomedicine · computational bi
 ## License
 
 MIT License
+
+📊 Data Availability
+- Primary dataset: Choi et al. (2022) [16] – values are hard‑coded in `exosome-pk-model.py` (lines 35–45).  
+- Cross‑validation datasets: Normalized time‑course data from Mirzaaghasi et al. (2021) [17] and Wiklander et al. (2015) [11] are provided in `data/` folder.  
+- Generated figures: All manuscript figures (Fig 1–15) can be reproduced by running the script.
