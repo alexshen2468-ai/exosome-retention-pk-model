@@ -1,4 +1,4 @@
-README = r”””# Exosome Retention PK Model
+README = Exosome Retention PK Model
 
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.8+-blue)](https://www.python.org/)
