@@ -1,9 +1,3 @@
-“””
-Generates README.md for the exosome-retention-pk-model GitHub repository.
-Run: python generate_readme.py
-Output: README.md in the current directory.
-“””
-
 README = r”””# Exosome Retention PK Model
 
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
