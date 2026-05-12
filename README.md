@@ -1,44 +1,11 @@
-README = Exosome Retention PK Model
+# Exosome Retention PK Model
 
+[![DOI](https://img.shields.io/badge/DOI-10.21203%2Frs.3.rs--7939584%2Fv1-blue)](https://doi.org/10.21203/rs.3.rs-7939584/v1)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.8+-blue)](https://www.python.org/)
-[![Status](https://img.shields.io/badge/status-manuscript_submitted-orange)]()
+[![Python](https://img.shields.io/badge/python-3.x-blue)](https://www.python.org/)
+[![Status](https://img.shields.io/badge/status-research_prototype-orange)](https://github.com/alexshen2468-ai/exosome-retention-pk-model)
 
-Mechanistic pharmacokinetic model for exosome retention dynamics based on retention-ratio theory.
-
------
-
-## Overview
-
-Extracellular vesicles (exosomes) are widely studied as drug delivery vehicles due to their biocompatibility, intrinsic targeting capability, and ability to transport therapeutic molecules. However, experimental studies consistently report a paradox:
-
-- rapid systemic clearance (blood half-life ≈ 1–2 h)
-- prolonged organ retention (liver accumulation persisting 24–168 h)
-
-Traditional PK models capture clearance but cannot mechanistically account for this decoupling. This repository provides the full computational implementation of a **reversible organ reservoir model (M3)** that resolves this paradox through a single dimensionless parameter:
-
-```
-R = k_bind / k_rel
-```
-
-R represents the balance between tissue binding and release, and directly determines the bound fraction R/(1+R) at pseudo-steady state.
-
------
-
-## Key Results
-
-|Metric                        |Value                   |
-|------------------------------|------------------------|
-|Fitted retention ratio R      |5.33                    |
-|Hepatic bound fraction at PSS |~84%                    |
-|Baseline plateau duration     |~60 h                   |
-|AICc improvement over M2      |8.4 units (decisive)    |
-|AICc improvement over M1      |19.6 units (decisive)   |
-|Cross-validation MAE (blood)  |0.090–0.118             |
-|Cross-validation MAE (liver)  |0.073–0.080             |
-|Dominant sensitivity parameter|k_rel (Sobol S1 = 0.182)|
-
-A novel **label persistence sensitivity analysis** (Fig 12) demonstrates that RMSE is minimised at zero label correction (α = 0), formally confirming that R correctly captures kinetic timescales independently of the ⁹⁹Zr radiolabel artefact.
+Mechanistic multi-scale pharmacokinetic model for exosome biodistribution and hepatic retention. Introduces the dimensionless **retention ratio R = k_bind / k_rel** as a compact, biologically interpretable design parameter for exosome-based drug delivery.
 
 -----
 
@@ -46,123 +13,205 @@ A novel **label persistence sensitivity analysis** (Fig 12) demonstrates that RM
 
 ```bash
 pip install numpy scipy matplotlib SALib
-python exosome_pk_model_v3_final.py
+python "exosome retention model (New).py"
 ```
 
-Generates all figures (Fig 1–12 and SFig 1–4) in the current directory. SALib is optional — if unavailable, Sobol analysis falls back to a built-in pure-numpy estimator automatically.
+Reproduces all 12 main figures and 4 supplementary figures from the manuscript.
 
-**Runtime:** approximately 5–10 minutes on a standard laptop (bootstrap n = 500 is the bottleneck).
+-----
+
+## Background
+
+Intravenously administered exosomes show a consistent paradox: blood concentrations fall rapidly (initial half-life ≈ 1–2 h), yet hepatic levels remain substantially elevated for 24–168 h. Classical one- or two-compartment PK models cannot explain this — they predict organ concentrations that track blood.
+
+This model resolves the paradox by introducing an explicit **reversible hepatic reservoir** governed by R = k_bind / k_rel.
+
+-----
+
+## Model Architecture
+
+Five coupled ODEs:
+
+```
+dB/dt  = −(k_clear + k_to + k_bp)·B + k_pb·P                        (1)
+dP/dt  =   k_bp·B − k_pb·P                                           (2)
+dLf/dt =   k_to·B + k_rel·Lb − k_bind·Lf − Vmax·Lf/(Km + Lf)       (3)
+dLb/dt =   k_bind·Lf − k_rel·Lb                                      (4)
+R      =   k_bind / k_rel                                             (5)
+```
+
+|Variable|Description                  |
+|--------|-----------------------------|
+|B       |Blood exosome (%ID)          |
+|P       |Peripheral tissue (%ID)      |
+|Lf      |Free hepatic exosome (%ID)   |
+|Lb      |Bound hepatic reservoir (%ID)|
+
+At pseudo-steady state, bound fraction = R / (1 + R). Fitted R ≈ 5.3 → ~84% of hepatic exosomes in reservoir.
+
+A pharmacodynamic sub-model (Michaelis-Menten uptake → drug release → hyperbolic E_max) is included as an illustrative projection; PD parameters are fixed at literature-informed values and not fitted to data.
+
+-----
+
+## Key Results
+
+### Model comparison (AICc)
+
+|Model |Structure                    |ΔAICc|Support          |
+|------|-----------------------------|-----|-----------------|
+|M1    |1-compartment, no reservoir  |19.6 |None             |
+|M2    |2-compartment, no reservoir  |8.4  |Considerably less|
+|**M3**|**2-compartment + reservoir**|**0**|**Best**         |
+
+ΔAICc > 10 = decisive evidence against (Burnham–Anderson criteria).
+
+### Fitted parameters
+
+|Parameter|Value  |Units|Bootstrap 95% CI|
+|---------|-------|-----|----------------|
+|k_clear  |0.350  |h⁻¹  |[0.301, 0.408]  |
+|k_to     |0.150  |h⁻¹  |[0.118, 0.192]  |
+|k_bind   |0.020  |h⁻¹  |[0.014, 0.029]  |
+|k_rel    |0.004  |h⁻¹  |[0.0028, 0.0061]|
+|**R**    |**5.3**|—    |—               |
+
+Bootstrap n = 500 resamples. RMSE = 3.06 %ID across both compartments.
+
+### Sobol sensitivity (hepatic AUC)
+
+k_rel is the dominant parameter (S₁ = 0.182). Reducing k_rel (slow off-rate engineering) is more effective at prolonging hepatic retention than increasing k_bind (binding avidity).
+
+-----
+
+## Data
+
+### Primary dataset — hard-coded in script
+
+Choi et al. (2022), ⁹⁹Zr-labelled GMP-grade exosomes, ICR mice, n = 4/timepoint:
+
+|time (h)|blood (%ID)|±SD|liver (%ID)|±SD|
+|--------|-----------|---|-----------|---|
+|0.25    |52.1       |6.8|8.3        |1.4|
+|1       |28.4       |4.2|22.6       |3.1|
+|2       |18.6       |3.8|28.1       |3.7|
+|6       |8.3        |2.1|38.9       |4.2|
+|24      |3.1        |0.9|45.2       |5.8|
+|48      |1.4        |0.4|41.7       |6.1|
+|72      |0.8        |0.3|36.4       |5.4|
+|120     |0.4        |0.2|28.8       |4.9|
+|168     |0.2        |0.1|21.3       |3.6|
+
+### Cross-validation datasets — loaded from CSV
+
+Normalised to t = 1 h (fluorescence; no absolute %ID calibration).
+
+**`mirzaaghasi_normalized.csv`** — DiR-labelled HEK293T, ICR mice, 1–8 h
+
+|time_h|blood_norm|liver_norm|
+|------|----------|----------|
+|1.0   |1.000     |0.190     |
+|2.0   |0.682     |0.420     |
+|3.0   |0.441     |0.601     |
+|4.0   |0.312     |0.710     |
+|8.0   |0.133     |0.882     |
+
+**`wiklander_normalized.csv`** — DiI-labelled C2C12, 1–24 h
+
+|time_h|blood_norm|liver_norm|
+|------|----------|----------|
+|1.0   |1.000     |0.280     |
+|3.0   |0.300     |0.640     |
+|6.0   |0.095     |0.800     |
+|24.0  |0.085     |0.960     |
+
+No parameter refitting was performed for cross-validation.
 
 -----
 
 ## Repository Structure
 
 ```
-exosome_pk_model_v3_final.py          # Main simulation script (all analyses + figures)
-mirzaaghasi_normalized.csv            # Cross-validation dataset 1 (Mirzaaghasi et al. 2021)
-wiklander_normalized.csv              # Cross-validation dataset 2 (Wiklander et al. 2015)
-requirements.txt                      # Python dependencies
-README.md                             # This file
-LICENSE                               # MIT licence
+exosome retention model (New).py   # Main simulation script
+mirzaaghasi_normalized.csv         # Cross-validation dataset 1
+wiklander_normalized.csv           # Cross-validation dataset 2
+Fig_retention_curves.png           # Example output
+requirements.txt                   # numpy scipy matplotlib SALib
+LICENSE                            # MIT
+README.md
+.gitignore
 ```
 
 -----
 
-## Figure Output
+## Figures Generated
 
-|File                       |Description                                 |Manuscript|
-|---------------------------|--------------------------------------------|----------|
-|Fig01.png                  |Blood exosome concentration fit             |Fig 1     |
-|Fig02.png                  |Hepatic exosome concentration fit           |Fig 2     |
-|Fig03.png                  |Intracellular uptake rate [illustrative]    |Fig 3     |
-|Fig04.png                  |Local drug concentration [illustrative]     |Fig 4     |
-|Fig05.png                  |Normalised therapeutic effect [illustrative]|Fig 5     |
-|Fig06.png                  |Model comparison M1 / M2 / M3               |Fig 6     |
-|Fig07.png                  |AICc bar chart                              |Fig 7     |
-|Fig08.png                  |Bootstrap distribution of k_rel             |Fig 8     |
-|Fig09.png                  |Sobol global sensitivity indices            |Fig 9     |
-|Fig10.png                  |Model structure schematic                   |Fig 10    |
-|Fig11.png                  |Plateau duration vs retention ratio R       |Fig 11    |
-|Fig12.png                  |Label persistence sensitivity analysis      |Fig 12    |
-|SFig01_hepatic_profiles.png|Hepatic profiles at R = 1, 3, 6, 10         |S Fig 1   |
-|SFig02_2D_heatmap.png      |2D heatmap: plateau duration vs (R, k_rel)  |S Fig 2   |
-|SFig03_crossval.png        |Independent cross-validation                |S Fig 3   |
-|SFig04_krel_reduction.png  |k_rel reduction simulations                 |S Fig 4   |
-
------
-
-## Model Structure
-
-```
-M1  One-compartment (blood only, first-order clearance)
-M2  Two-compartment (blood + peripheral); organ tracks blood
-M3  Reservoir model (proposed):
-
-  Blood (B) ──k_to──> Organ free (L_f) <──k_rel── Organ bound (L_b)
-                                              ───k_bind──>
-                        L_f ──Michaelis-Menten──> Intracellular (C_cell)
-                        C_cell ──q──> Drug (C_drug)
-                        Effect = C_drug / (C_drug + EC50)
-
-  Retention ratio:  R = k_bind / k_rel
-  Bound fraction:   R / (1 + R)
-```
+|Figure|Description                                     |
+|------|------------------------------------------------|
+|Fig 1 |Blood concentration — M3 vs Choi et al.         |
+|Fig 2 |Hepatic concentration — M3 vs ⁹⁹Zr signal       |
+|Fig 3 |Intracellular uptake rate (illustrative)        |
+|Fig 4 |Local drug concentration (illustrative)         |
+|Fig 5 |Normalised therapeutic effect (illustrative)    |
+|Fig 6 |M1 / M2 / M3 comparison on blood data           |
+|Fig 7 |AICc bar chart                                  |
+|Fig 8 |Bootstrap distribution of k_rel (n = 500)       |
+|Fig 9 |Sobol sensitivity indices                       |
+|Fig 10|Classical vs reservoir model schematic          |
+|Fig 11|Plateau duration vs retention ratio R           |
+|Fig 12|Label persistence sensitivity analysis (4-panel)|
+|Fig S1|Hepatic profiles at R = 1, 3, 6, 10             |
+|Fig S2|2D landscape: plateau duration vs (R, k_rel)    |
+|Fig S3|Cross-validation — Mirzaaghasi + Wiklander      |
+|Fig S4|Progressive k_rel reduction scenarios           |
 
 -----
 
-## Datasets
+## Limitations
 
-|Dataset                |Source              |Exosome type|Label|Timepoints|Use             |
-|-----------------------|--------------------|------------|-----|----------|----------------|
-|Choi et al. 2022       |Pharmaceutics       |GMP-grade   |⁹⁹Zr |0.25–168 h|Primary fit     |
-|Mirzaaghasi et al. 2021|Pharmaceutics       |HEK293T     |DiR  |1–8 h     |Cross-validation|
-|Wiklander et al. 2015  |J Extracell Vesicles|C2C12       |DiI  |1–24 h    |Cross-validation|
-
-Primary data (Choi et al.) are hard-coded in the script. Cross-validation data are provided as CSV files in the repository.
+- Absolute hepatic concentration is underestimated (~3–4×) due to ⁹⁹Zr radiolabel persistence; formally characterised in Fig 12
+- Cross-validation on normalised fluorescence data only — not absolute %ID
+- Liver treated as a single well-mixed compartment; Kupffer cell / LSEC heterogeneity not modelled
+- PD parameters (V_max, K_m, EC50) fixed at literature values; Figs 3–5 are illustrative only
+- Protein corona dynamics not modelled (k_bind, k_rel assumed time-invariant)
 
 -----
 
-## Computational Methods
+## Preprint
 
-- ODE integration: adaptive RK4(5), `scipy.integrate.solve_ivp` (rtol=1e⁻⁶, atol=1e⁻⁹)
-- Parameter estimation: Levenberg-Marquardt, 10 random initialisations
-- Model selection: bias-corrected AIC (AICc); ΔAICc > 10 = decisive evidence
-- Uncertainty: non-parametric bootstrap resampling (n = 500)
-- Sensitivity: Sobol variance decomposition via SALib (n = 1024 Saltelli samples, ±50% ranges)
-- Label sensitivity: extended M3 with degraded-label pool; α scanned 0 → 1
-
------
-
-## Research Identity
-
-This repository is maintained by **Zhuofan Shen**, an undergraduate researcher in biotechnology focusing on computational modeling of exosome-mediated drug delivery systems, with emphasis on retention, biodistribution, and pharmacokinetics.
-
-- ORCID: https://orcid.org/0009-0005-4304-8391
-- GitHub: https://github.com/alexshen2468-ai
+Shen, Z. (2026). *Mechanistic modeling of exosome pharmacokinetics reveals a retention ratio governing sustained organ accumulation.* Research Square.
+https://doi.org/10.21203/rs.3.rs-7939584/v1
 
 -----
 
 ## Citation
 
-If you use this code, please cite:
-
-> Shen Z. Mechanistic modeling of exosome pharmacokinetics reveals a retention ratio governing sustained organ accumulation. *Manuscript submitted*, 2026.
+```bibtex
+@misc{shen2026exosome,
+  author    = {Shen, Zhuofan},
+  title     = {Mechanistic modeling of exosome pharmacokinetics reveals
+               a retention ratio governing sustained organ accumulation},
+  year      = {2026},
+  publisher = {Research Square},
+  doi       = {10.21203/rs.3.rs-7939584/v1}
+}
+```
 
 -----
 
-## Keywords
+## Author
 
-exosome · pharmacokinetics · drug delivery · nanomedicine · computational biology · PK/PD modeling · biodistribution · retention ratio · organ accumulation
+**Zhuofan Shen** — Biotechnology Program, University of Debrecen
+
+- ORCID: [0009-0005-4304-8391](https://orcid.org/0009-0005-4304-8391)
+- Email: alexshen2468@gmail.com
+- GitHub: [@alexshen2468-ai](https://github.com/alexshen2468-ai)
 
 -----
 
 ## License
 
-MIT License — see <LICENSE> for details.
-“””
+MIT © 2026 alexshen2468-ai
 
-with open(“README.md”, “w”, encoding=“utf-8”) as f:
-f.write(README)
+-----
 
-print(“README.md written successfully.”)
-print(f”Total lines: {len(README.splitlines())}”)
+**Keywords:** exosome · pharmacokinetics · retention ratio · drug delivery · ODE modeling · biodistribution · reservoir model · nanomedicine
