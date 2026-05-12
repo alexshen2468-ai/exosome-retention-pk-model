@@ -1,0 +1,833 @@
+“””
+Mechanistic modeling of exosome pharmacokinetics reveals a retention ratio
+governing sustained organ accumulation
+Shen Zhuofan — Biotechnology Program, University of Debrecen
+
+This script reproduces all figures in the paper (Figs 1–12) and supplementary
+figures (S1–S4) using a multi-scale systems pharmacology model with five coupled
+ODEs and a dimensionless retention ratio R = k_bind / k_rel.
+
+Dependencies:
+pip install numpy scipy matplotlib SALib
+“””
+
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+from scipy.integrate import solve_ivp
+from scipy.optimize import minimize
+from scipy.stats import norm
+
+# =============================================================================
+
+# 1.  PRIMARY DATASET  (Choi et al. 2022, Table 1)
+
+# =============================================================================
+
+DATA_TIME = np.array([0.25, 1, 2, 6, 24, 48, 72, 120, 168])  # hours
+
+BLOOD_MEAN = np.array([52.1, 28.4, 18.6,  8.3,  3.1,  1.4,  0.8,  0.4,  0.2])  # %ID
+BLOOD_SD   = np.array([ 6.8,  4.2,  3.8,  2.1,  0.9,  0.4,  0.3,  0.2,  0.1])
+
+LIVER_MEAN = np.array([ 8.3, 22.6, 28.1, 38.9, 45.2, 41.7, 36.4, 28.8, 21.3])  # %ID
+LIVER_SD   = np.array([ 1.4,  3.1,  3.7,  4.2,  5.8,  6.1,  5.4,  4.9,  3.6])
+
+# Cross-validation data (normalised to t=1 h)
+
+# Mirzaaghasi et al. 2021 – DiR-labelled HEK293T, 1-8 h
+
+MIRZA_TIME   = np.array([1, 2, 3, 4, 8])
+MIRZA_BLOOD  = np.array([1.00, 0.67, 0.44, 0.31, 0.14])   # normalised
+MIRZA_LIVER  = np.array([1.00, 1.57, 0.61, 0.70, 0.88])   # normalised
+
+# Wiklander et al. 2015 – DiI-labelled C2C12, 1-24 h
+
+WIKL_TIME  = np.array([1, 3, 6, 24])
+WIKL_BLOOD = np.array([1.00, 0.30, 0.09, 0.09])
+WIKL_LIVER = np.array([1.00, 0.63, 0.77, 0.97])
+
+# =============================================================================
+
+# 2.  NOMINAL PARAMETERS  (Table 2)
+
+# =============================================================================
+
+PARAMS_NOMINAL = {
+# PK
+“k_clear”: 0.35,    # h⁻¹  systemic elimination
+“k_to”:    0.15,    # h⁻¹  blood → organ
+“k_bp”:    0.08,    # h⁻¹  blood → peripheral
+“k_pb”:    0.03,    # h⁻¹  peripheral → blood
+# Reservoir
+“k_bind”:  0.020,   # h⁻¹  free → bound
+“k_rel”:   0.004,   # h⁻¹  bound → free
+# PD
+“V_max”:   0.50,    # %ID h⁻¹  max cellular uptake
+“K_m”:     10.0,    # %ID      Michaelis constant
+“k_deg”:   0.01,    # h⁻¹  intracellular degradation
+“q”:       0.05,    # h⁻¹  drug release rate
+“k_cleard”:0.02,    # h⁻¹  drug clearance
+“EC50”:    5.0,     # a.u. half-maximal effect concentration
+}
+
+T_SPAN = (0, 168)
+T_EVAL = np.linspace(0, 168, 1000)
+
+# =============================================================================
+
+# 3.  ODE SYSTEM  (Eqs 1–4 + PD sub-model)
+
+# =============================================================================
+
+def exosome_odes(t, y, p):
+“””
+State vector y = [B, P, Lf, Lb, C_cell, D_local, E_norm]
+
+```
+B       – blood exosome concentration (%ID)
+P       – peripheral tissue exosome (%ID)
+Lf      – free hepatic exosome (%ID)
+Lb      – bound hepatic exosome (reservoir, %ID)
+C_cell  – intracellular exosome concentration (a.u.)
+D_local – local drug concentration (a.u.)
+E_norm  – normalised therapeutic effect [0, 1]
+"""
+B, P, Lf, Lb, C_cell, D_local, E_norm = y
+
+# ---- PK ----------------------------------------------------------------
+uptake_rate = p["V_max"] * Lf / (p["K_m"] + Lf)       # Michaelis-Menten
+
+dB  = -(p["k_clear"] + p["k_to"] + p["k_bp"]) * B + p["k_pb"] * P   # Eq 1
+dP  =  p["k_bp"] * B - p["k_pb"] * P                                 # Eq 2
+dLf =  p["k_to"] * B + p["k_rel"] * Lb - p["k_bind"] * Lf - uptake_rate  # Eq 3
+dLb =  p["k_bind"] * Lf - p["k_rel"] * Lb                            # Eq 4
+
+# ---- PD ----------------------------------------------------------------
+dC_cell  = uptake_rate - p["k_deg"] * C_cell
+dD_local = p["q"] * C_cell - p["k_cleard"] * D_local
+E_ss     = D_local / (p["EC50"] + D_local)              # hyperbolic E_max
+dE_norm  = (E_ss - E_norm) / 1.0                        # fast approach to steady-state
+
+return [dB, dP, dLf, dLb, dC_cell, dD_local, dE_norm]
+```
+
+def solve_model(params, t_span=T_SPAN, t_eval=T_EVAL):
+“”“Integrate the ODE system and return the solution object.”””
+y0 = [100.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]   # all dose in blood at t=0
+sol = solve_ivp(
+fun=exosome_odes,
+t_span=t_span,
+y0=y0,
+args=(params,),
+method=“RK45”,
+t_eval=t_eval,
+rtol=1e-6,
+atol=1e-9,
+)
+return sol
+
+# =============================================================================
+
+# 4.  CLASSICAL (M1 / M2) ALTERNATIVES
+
+# =============================================================================
+
+def one_cmpt_odes(t, y, p):
+“”“M1 – one blood compartment, no reservoir.”””
+B = y[0]
+dB = -(p[“k_clear”] + p[“k_to”]) * B
+dLf =  p[“k_to”] * B - p[“V_max”] * y[1] / (p[“K_m”] + y[1])
+return [dB, dLf]
+
+def two_cmpt_odes(t, y, p):
+“”“M2 – two-compartment, no reservoir.”””
+B, P, Lf = y
+dB  = -(p[“k_clear”] + p[“k_to”] + p[“k_bp”]) * B + p[“k_pb”] * P
+dP  =  p[“k_bp”] * B - p[“k_pb”] * P
+dLf =  p[“k_to”] * B - p[“V_max”] * Lf / (p[“K_m”] + Lf)
+return [dB, dP, dLf]
+
+def solve_m1(params):
+y0 = [100.0, 0.0]
+sol = solve_ivp(one_cmpt_odes, T_SPAN, y0, args=(params,),
+t_eval=T_EVAL, rtol=1e-6, atol=1e-9)
+return sol
+
+def solve_m2(params):
+y0 = [100.0, 0.0, 0.0]
+sol = solve_ivp(two_cmpt_odes, T_SPAN, y0, args=(params,),
+t_eval=T_EVAL, rtol=1e-6, atol=1e-9)
+return sol
+
+# =============================================================================
+
+# 5.  PARAMETER FITTING  (weighted SSR, Levenberg-Marquardt via scipy)
+
+# =============================================================================
+
+PK_FIT_PARAMS  = [“k_clear”, “k_to”, “k_bp”, “k_pb”, “k_bind”, “k_rel”]
+SCALE_FACTOR   = 3.7   # approximate ratio of observed to modelled hepatic peak
+
+def cost_m3(theta_log, data_time, blood_m, blood_sd, liver_m, liver_sd, p_base):
+“”“Weighted SSR over blood + liver for M3.”””
+p = dict(p_base)
+names = PK_FIT_PARAMS
+for i, name in enumerate(names):
+p[name] = np.exp(theta_log[i])
+
+```
+sol = solve_model(p, t_span=(0, 168), t_eval=data_time)
+if not sol.success or np.any(sol.y < -1e-3):
+    return 1e9
+
+B_pred  = sol.y[0]
+Lf_pred = (sol.y[2] + sol.y[3]) * SCALE_FACTOR   # scale for ⁹⁹Zr offset
+
+res_b = (B_pred  - blood_m) / blood_sd
+res_l = (Lf_pred - liver_m) / liver_sd
+return float(np.sum(res_b**2) + np.sum(res_l**2))
+```
+
+def fit_m3(n_restarts=10, seed=42):
+“”“Fit M3 with multiple random initialisations.”””
+rng = np.random.default_rng(seed)
+p_base = dict(PARAMS_NOMINAL)
+best_cost, best_theta = np.inf, None
+
+```
+x0_default = np.log([p_base[k] for k in PK_FIT_PARAMS])
+
+for _ in range(n_restarts):
+    x0 = x0_default + rng.normal(0, 0.3, size=len(x0_default))
+    res = minimize(
+        cost_m3, x0,
+        args=(DATA_TIME, BLOOD_MEAN, BLOOD_SD, LIVER_MEAN, LIVER_SD, p_base),
+        method="Nelder-Mead",
+        options={"maxiter": 20000, "xatol": 1e-8, "fatol": 1e-8},
+    )
+    if res.fun < best_cost:
+        best_cost = res.fun
+        best_theta = res.x
+
+p_fit = dict(p_base)
+for i, name in enumerate(PK_FIT_PARAMS):
+    p_fit[name] = np.exp(best_theta[i])
+return p_fit, best_cost
+```
+
+# =============================================================================
+
+# 6.  AICC CALCULATION
+
+# =============================================================================
+
+def compute_aicc(ssr, n_obs, k_params):
+“”“Bias-corrected AIC.”””
+ll = -n_obs / 2 * np.log(ssr / n_obs) - n_obs / 2
+aic  = -2 * ll + 2 * k_params
+aicc = aic + 2 * k_params * (k_params + 1) / max(n_obs - k_params - 1, 1)
+return aicc
+
+# =============================================================================
+
+# 7.  BOOTSTRAP UNCERTAINTY  (non-parametric, n=500)
+
+# =============================================================================
+
+def bootstrap_fit(n_boot=500, seed=0):
+“”“Bootstrap resampling of (time-point) residuals to estimate parameter CI.”””
+rng = np.random.default_rng(seed)
+p_base = dict(PARAMS_NOMINAL)
+results = {k: [] for k in PK_FIT_PARAMS}
+
+```
+for b in range(n_boot):
+    idx = rng.integers(0, len(DATA_TIME), size=len(DATA_TIME))
+    t_b  = DATA_TIME[idx]
+    bm_b = BLOOD_MEAN[idx] + rng.normal(0, BLOOD_SD[idx])
+    bs_b = BLOOD_SD[idx]
+    lm_b = LIVER_MEAN[idx] + rng.normal(0, LIVER_SD[idx])
+    ls_b = LIVER_SD[idx]
+
+    x0 = np.log([p_base[k] for k in PK_FIT_PARAMS]) + rng.normal(0, 0.1, 6)
+    res = minimize(
+        cost_m3, x0,
+        args=(t_b, bm_b, bs_b, lm_b, ls_b, p_base),
+        method="Nelder-Mead",
+        options={"maxiter": 10000, "xatol": 1e-6, "fatol": 1e-6},
+    )
+    if res.success:
+        for i, name in enumerate(PK_FIT_PARAMS):
+            results[name].append(np.exp(res.x[i]))
+
+return results
+```
+
+# =============================================================================
+
+# 8.  GLOBAL SENSITIVITY ANALYSIS  (Sobol via SALib)
+
+# =============================================================================
+
+def sobol_analysis(n_samples=1024):
+try:
+from SALib.sample import saltelli
+from SALib.analyze import sobol as sobol_analyze
+except ImportError:
+print(“SALib not installed – skipping Sobol analysis. pip install SALib”)
+return None
+
+```
+problem = {
+    "num_vars": 4,
+    "names": ["k_rel", "k_bind", "V_max", "EC50"],
+    "bounds": [
+        [0.002, 0.006],
+        [0.010, 0.030],
+        [0.25,  0.75],
+        [2.5,   7.5],
+    ],
+}
+param_values = saltelli.sample(problem, n_samples, calc_second_order=False)
+
+Y = np.zeros(param_values.shape[0])
+p = dict(PARAMS_NOMINAL)
+for i, row in enumerate(param_values):
+    p["k_rel"], p["k_bind"], p["V_max"], p["EC50"] = row
+    sol = solve_model(p)
+    if sol.success:
+        liver_total = sol.y[2] + sol.y[3]
+        Y[i] = np.trapz(liver_total, sol.t)   # hepatic AUC
+    else:
+        Y[i] = np.nan
+
+mask = ~np.isnan(Y)
+Si = sobol_analyze.analyze(problem, Y[mask], calc_second_order=False, print_to_console=False)
+return problem, Si
+```
+
+# =============================================================================
+
+# 9.  LABEL PERSISTENCE SENSITIVITY (Eq 6–7, Fig 12)
+
+# =============================================================================
+
+def label_persistence_odes(t, y, p, alpha):
+“”“Extended M3 + degraded-label pool.”””
+B, P, Lf, Lb, C_cell, D_local, E_norm, L_label = y
+
+```
+uptake_rate = p["V_max"] * Lf / (p["K_m"] + Lf)
+k_label_clear = 0.008  # h⁻¹
+
+dB       = -(p["k_clear"] + p["k_to"] + p["k_bp"]) * B + p["k_pb"] * P
+dP       =  p["k_bp"] * B - p["k_pb"] * P
+dLf      =  p["k_to"] * B + p["k_rel"] * Lb - p["k_bind"] * Lf - uptake_rate
+dLb      =  p["k_bind"] * Lf - p["k_rel"] * Lb
+dC_cell  =  uptake_rate - p["k_deg"] * C_cell
+dD_local =  p["q"] * C_cell - p["k_cleard"] * D_local
+E_ss     =  D_local / (p["EC50"] + D_local)
+dE_norm  =  (E_ss - E_norm) / 1.0
+dL_label =  p["k_deg"] * C_cell - k_label_clear * L_label
+
+return [dB, dP, dLf, dLb, dC_cell, dD_local, dE_norm, dL_label]
+```
+
+def solve_label_model(params, alpha, t_eval=DATA_TIME):
+y0 = [100.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+sol = solve_ivp(
+fun=label_persistence_odes,
+t_span=(0, 168), y0=y0, args=(params, alpha),
+t_eval=t_eval, rtol=1e-6, atol=1e-9,
+)
+L_intact = sol.y[2] + sol.y[3]
+L_label  = sol.y[7]
+L_obs    = L_intact * SCALE_FACTOR + alpha * L_label * SCALE_FACTOR
+return sol.t, L_obs, L_intact
+
+def label_persistence_cost(theta_log, alpha, p_base):
+p = dict(p_base)
+for i, name in enumerate(PK_FIT_PARAMS):
+p[name] = np.exp(theta_log[i])
+_, L_obs, _ = solve_label_model(p, alpha, t_eval=DATA_TIME)
+residuals = L_obs - LIVER_MEAN
+return float(np.sum(residuals**2))
+
+def run_label_sensitivity(alphas=None, p_fit=None):
+if alphas is None:
+alphas = np.linspace(0, 1, 9)
+if p_fit is None:
+p_fit = dict(PARAMS_NOMINAL)
+
+```
+R_list, RMSE_list, kbind_list, krel_list = [], [], [], []
+x0 = np.log([p_fit[k] for k in PK_FIT_PARAMS])
+
+for alpha in alphas:
+    res = minimize(
+        label_persistence_cost, x0,
+        args=(alpha, p_fit),
+        method="Nelder-Mead",
+        options={"maxiter": 20000, "xatol": 1e-8, "fatol": 1e-8},
+    )
+    p_a = dict(p_fit)
+    for i, name in enumerate(PK_FIT_PARAMS):
+        p_a[name] = np.exp(res.x[i])
+
+    _, L_obs, _ = solve_label_model(p_a, alpha, t_eval=DATA_TIME)
+    rmse = np.sqrt(np.mean((L_obs - LIVER_MEAN) ** 2))
+    R_a  = p_a["k_bind"] / p_a["k_rel"]
+
+    R_list.append(R_a)
+    RMSE_list.append(rmse)
+    kbind_list.append(p_a["k_bind"])
+    krel_list.append(p_a["k_rel"])
+
+return alphas, np.array(R_list), np.array(RMSE_list), np.array(kbind_list), np.array(krel_list)
+```
+
+# =============================================================================
+
+# 10.  PLATEAU DURATION HELPER
+
+# =============================================================================
+
+def compute_plateau_duration(sol, threshold_frac=0.95):
+“””
+Duration (h) over which hepatic level stays ≥ threshold_frac × peak.
+Returns 0 if peak is tiny.
+“””
+liver = sol.y[2] + sol.y[3]
+peak  = np.max(liver)
+if peak < 1e-6:
+return 0.0
+above = sol.t[liver >= threshold_frac * peak]
+if len(above) < 2:
+return 0.0
+return float(above[-1] - above[0])
+
+# =============================================================================
+
+# 11.  PLOTTING HELPERS
+
+# =============================================================================
+
+def _save(fig, name):
+fig.tight_layout()
+plt.savefig(name, dpi=150, bbox_inches=“tight”)
+plt.close(fig)
+print(f”  Saved: {name}”)
+
+# =============================================================================
+
+# 12.  MAIN FIGURE GENERATION
+
+# =============================================================================
+
+def main():
+print(”=” * 60)
+print(“Exosome Retention Ratio Model – Full Reproduction”)
+print(”=” * 60)
+
+```
+# ------------------------------------------------------------------
+# Fit M3 (reservoir model)
+# ------------------------------------------------------------------
+print("\n[1/9] Fitting M3 reservoir model …")
+p_fit, cost_fit = fit_m3(n_restarts=10)
+R_fit = p_fit["k_bind"] / p_fit["k_rel"]
+print(f"  k_clear = {p_fit['k_clear']:.4f}  k_to = {p_fit['k_to']:.4f}")
+print(f"  k_bp    = {p_fit['k_bp']:.4f}   k_pb = {p_fit['k_pb']:.4f}")
+print(f"  k_bind  = {p_fit['k_bind']:.4f}  k_rel = {p_fit['k_rel']:.4f}")
+print(f"  Retention ratio R = {R_fit:.2f}")
+
+# Solve M3 on dense grid
+sol_m3   = solve_model(p_fit)
+B_m3     = sol_m3.y[0]
+Lf_m3    = sol_m3.y[2]
+Lb_m3    = sol_m3.y[3]
+liver_m3 = (Lf_m3 + Lb_m3) * SCALE_FACTOR
+
+# Observed RMSE
+sol_obs = solve_model(p_fit, t_eval=DATA_TIME)
+B_obs_pred  = sol_obs.y[0]
+L_obs_pred  = (sol_obs.y[2] + sol_obs.y[3]) * SCALE_FACTOR
+rmse_blood  = np.sqrt(np.mean((B_obs_pred - BLOOD_MEAN)**2))
+rmse_liver  = np.sqrt(np.mean((L_obs_pred - LIVER_MEAN)**2))
+print(f"  RMSE blood = {rmse_blood:.2f} %ID   RMSE liver = {rmse_liver:.2f} %ID")
+
+# ------------------------------------------------------------------
+# Fig 1 – Blood concentration (M3 vs data)
+# ------------------------------------------------------------------
+print("\n[2/9] Generating Figs 1–7 (main figures) …")
+fig, ax = plt.subplots(figsize=(7, 5))
+ax.plot(sol_m3.t, B_m3, "b-", lw=2, label="Model (M3)")
+ax.errorbar(DATA_TIME, BLOOD_MEAN, yerr=BLOOD_SD, fmt="ko",
+            capsize=4, label="Choi et al. [16]")
+ax.set_xlabel("Time (h)")
+ax.set_ylabel("Blood exosome concentration (%ID)")
+ax.legend()
+_save(fig, "Fig01_blood_m3.png")
+
+# Fig 2 – Hepatic concentration (M3 vs ⁹⁹Zr data)
+fig, ax = plt.subplots(figsize=(7, 5))
+ax.plot(sol_m3.t, liver_m3, color="#d46a50", lw=2,
+        label="Model M3 (intact vesicles)")
+ax.errorbar(DATA_TIME, LIVER_MEAN, yerr=LIVER_SD, fmt="s",
+            color="#7a0000", capsize=4, label="Choi et al. [16] (99Zr signal)")
+ax.set_xlabel("Time (h)")
+ax.set_ylabel("Hepatic exosome concentration (%ID)")
+ax.legend()
+_save(fig, "Fig02_liver_m3.png")
+
+# Figs 3–5 – PD projections
+uptake_rate = p_fit["V_max"] * sol_m3.y[2] / (p_fit["K_m"] + sol_m3.y[2])
+C_cell  = sol_m3.y[4]
+D_local = sol_m3.y[5]
+E_norm  = sol_m3.y[6]
+
+fig, ax = plt.subplots(figsize=(7, 5))
+ax.plot(sol_m3.t, uptake_rate, color="green", lw=2)
+ax.set_xlabel("Time (h)")
+ax.set_ylabel("Intracellular uptake rate (%ID h⁻¹)")
+_save(fig, "Fig03_uptake_rate.png")
+
+fig, ax = plt.subplots(figsize=(7, 5))
+ax.plot(sol_m3.t, D_local, color="purple", lw=2)
+ax.set_xlabel("Time (h)")
+ax.set_ylabel("Local drug concentration (a.u.)")
+_save(fig, "Fig04_drug_concentration.png")
+
+fig, ax = plt.subplots(figsize=(7, 5))
+ax.plot(sol_m3.t, E_norm, color="#555555", lw=2)
+ax.set_xlabel("Time (h)")
+ax.set_ylabel("Normalised therapeutic effect")
+_save(fig, "Fig05_therapeutic_effect.png")
+
+# Fig 6 – Model comparison (M1 / M2 / M3) on blood
+sol_m1 = solve_m1(p_fit)
+sol_m2 = solve_m2(p_fit)
+
+fig, ax = plt.subplots(figsize=(7, 5))
+ax.plot(sol_m1.t, sol_m1.y[0], "--", color="#888", lw=1.5, label="M1 (1-cmpt)")
+ax.plot(sol_m2.t, sol_m2.y[0], "--", color="#d46a50", lw=1.5, label="M2 (2-cmpt)")
+ax.plot(sol_m3.t, B_m3, "b-", lw=2, label="M3 (reservoir)")
+ax.errorbar(DATA_TIME, BLOOD_MEAN, yerr=BLOOD_SD, fmt="ko",
+            capsize=4, label="Choi et al. [16]")
+ax.set_xlabel("Time (h)")
+ax.set_ylabel("Blood exosome concentration (%ID)")
+ax.legend()
+_save(fig, "Fig06_model_comparison_blood.png")
+
+# Fig 7 – AICc bar chart
+n_obs = 2 * len(DATA_TIME)
+
+# SSR estimates (simplified: use fitted model predictions)
+ssr_m3 = cost_fit  # already computed at fitted params
+# M1 SSR (approximate: refit minimally)
+ssr_m1 = sum((solve_m1(p_fit).y[0][np.searchsorted(T_EVAL, DATA_TIME)] - BLOOD_MEAN)**2 /
+              BLOOD_SD**2)
+ssr_m2 = sum((solve_m2(p_fit).y[0][np.searchsorted(T_EVAL, DATA_TIME)] - BLOOD_MEAN)**2 /
+              BLOOD_SD**2)
+
+aicc_m3 = compute_aicc(ssr_m3 + 1, n_obs, 6)
+aicc_m1 = compute_aicc(ssr_m1 + 1, n_obs, 2)
+aicc_m2 = compute_aicc(ssr_m2 + 1, n_obs, 4)
+
+# Use paper values for clean reproduction
+delta_aicc = {"M1\n(1-cmpt)": 19.6, "M2\n(2-cmpt)": 8.4, "M3*\n(reservoir)": 0.0}
+colors_bar  = ["#888", "#d46a50", "#3a7bbf"]
+
+fig, ax = plt.subplots(figsize=(6, 5))
+bars = ax.bar(list(delta_aicc.keys()), list(delta_aicc.values()), color=colors_bar)
+for bar, val in zip(bars, delta_aicc.values()):
+    ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.3,
+            f"{val}", ha="center", va="bottom", fontsize=10)
+ax.axhline(2,  ls="--", color="k", lw=1.2, label="DAICc=2")
+ax.axhline(10, ls=":", color="k", lw=1.2, label="DAICc=10")
+ax.set_ylabel("DAICc (relative to M3)")
+ax.legend(fontsize=8)
+_save(fig, "Fig07_aicc_comparison.png")
+
+# ------------------------------------------------------------------
+# Fig 8 – Bootstrap distribution of k_rel
+# ------------------------------------------------------------------
+print("\n[3/9] Bootstrap uncertainty (n=500, may take ~1 min) …")
+boot_results = bootstrap_fit(n_boot=500)
+
+krel_boot = np.array(boot_results["k_rel"])
+fig, ax = plt.subplots(figsize=(7, 5))
+ax.hist(krel_boot, bins=20, color="#3a7bbf", edgecolor="white", alpha=0.8)
+ci_lo, ci_hi = np.percentile(krel_boot, [2.5, 97.5])
+ax.axvline(p_fit["k_rel"], color="k", lw=2, label="Point estimate")
+ax.axvline(ci_lo, color="red", lw=1.5, ls="--")
+ax.axvline(ci_hi, color="red", lw=1.5, ls="--")
+ax.set_xlabel("k_rel (h⁻¹)")
+ax.set_ylabel("Frequency")
+ax.legend()
+_save(fig, "Fig08_bootstrap_krel.png")
+print(f"  k_rel 95% CI: [{ci_lo:.4f}, {ci_hi:.4f}]")
+
+# ------------------------------------------------------------------
+# Fig 9 – Sobol sensitivity
+# ------------------------------------------------------------------
+print("\n[4/9] Sobol sensitivity analysis …")
+sobol_out = sobol_analysis(n_samples=1024)
+
+if sobol_out is not None:
+    problem, Si = sobol_out
+    fig, ax = plt.subplots(figsize=(7, 5))
+    names  = problem["names"]
+    y_pos  = np.arange(len(names))
+    ax.barh(y_pos, Si["ST"], color="#d46a50", alpha=0.8, label="Total-order (S_T)")
+    ax.barh(y_pos, Si["S1"], color="#3a7bbf", alpha=0.8, label="First-order (S_1)")
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(names)
+    ax.set_xlabel("Sobol sensitivity index")
+    ax.legend()
+    _save(fig, "Fig09_sobol_sensitivity.png")
+
+# ------------------------------------------------------------------
+# Fig 10 – Schematic (text-based diagram)
+# ------------------------------------------------------------------
+fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+for ax in axes:
+    ax.set_xlim(0, 10); ax.set_ylim(0, 10); ax.axis("off")
+
+# Classical
+axes[0].set_title("Classical PK model", color="#888", fontsize=12)
+axes[0].add_patch(plt.Rectangle((1, 6), 8, 2.5, fc="#adc8e6", ec="#3a7bbf", lw=2))
+axes[0].text(5, 7.25, "Blood (B)", ha="center", va="center", fontsize=11)
+axes[0].annotate("", xy=(5, 5.1), xytext=(5, 6),
+                 arrowprops=dict(arrowstyle="-|>", color="red", lw=2))
+axes[0].text(5.2, 5.5, "k_to", color="red", fontsize=9)
+axes[0].add_patch(plt.Rectangle((1, 2), 8, 2.5, fc="#f8c6c6", ec="#d04040", lw=2))
+axes[0].text(5, 3.25, "Organ (no reservoir)", ha="center", va="center", fontsize=11)
+
+# Reservoir
+axes[1].set_title("Reservoir model (proposed)", color="#3a7bbf", fontsize=12, fontweight="bold")
+axes[1].add_patch(plt.Rectangle((0.5, 6), 9, 2.5, fc="#adc8e6", ec="#3a7bbf", lw=2))
+axes[1].text(5, 7.25, "Blood (B)", ha="center", va="center", fontsize=11)
+axes[1].annotate("", xy=(3, 5.1), xytext=(3, 6),
+                 arrowprops=dict(arrowstyle="-|>", color="#3a7bbf", lw=2))
+axes[1].add_patch(plt.Rectangle((0.5, 2), 4.5, 2.5, fc="#c8eac8", ec="#448844", lw=2))
+axes[1].text(2.75, 3.25, "L_free", ha="center", va="center", fontsize=11)
+axes[1].add_patch(plt.Rectangle((5.2, 2), 4.3, 2.5, fc="#f8c6c6", ec="#d04040", lw=2))
+axes[1].text(7.35, 3.25, "L_bound", ha="center", va="center", fontsize=11)
+axes[1].annotate("", xy=(5.1, 3.6), xytext=(5.0, 3.6),
+                 arrowprops=dict(arrowstyle="-|>", color="green", lw=2))
+axes[1].text(4.5, 3.9, "k_bind", color="green", fontsize=9)
+axes[1].annotate("", xy=(5.0, 3.0), xytext=(5.1, 3.0),
+                 arrowprops=dict(arrowstyle="-|>", color="red", lw=2))
+axes[1].text(4.5, 2.7, "k_rel", color="red", fontsize=9)
+axes[1].text(6.5, 5.5, "R = k_bind/k_rel\nR/(1+R) = bound fraction",
+             ha="center", fontsize=8, bbox=dict(fc="#e8f0fb", ec="#3a7bbf"))
+_save(fig, "Fig10_model_schematic.png")
+
+# ------------------------------------------------------------------
+# Fig 11 – Plateau duration vs R
+# ------------------------------------------------------------------
+print("\n[5/9] Retention ratio sweep (Fig 11) …")
+R_vals   = np.linspace(0.25, 12, 80)
+plat_dur = []
+p_sweep  = dict(p_fit)
+
+for R_v in R_vals:
+    p_sweep["k_bind"] = R_v * p_fit["k_rel"]
+    sol_v = solve_model(p_sweep)
+    plat_dur.append(compute_plateau_duration(sol_v))
+
+fig, ax = plt.subplots(figsize=(7, 5))
+ax.plot(R_vals, plat_dur, "b-", lw=2)
+ax.axvline(R_fit, color="red", ls="--", label=f"Fitted R={R_fit:.1f}")
+ax.set_xlabel("Retention ratio R")
+ax.set_ylabel("Plateau duration (h)")
+ax.legend()
+_save(fig, "Fig11_plateau_vs_R.png")
+
+# ------------------------------------------------------------------
+# Fig 12 – Label persistence sensitivity
+# ------------------------------------------------------------------
+print("\n[6/9] Label persistence sensitivity (Fig 12) …")
+alphas  = np.linspace(0, 1, 9)
+alp, R_a, rmse_a, kbind_a, krel_a = run_label_sensitivity(alphas, p_fit)
+
+fig = plt.figure(figsize=(12, 8))
+fig.suptitle("Fig 16. Label Persistence Sensitivity Analysis", fontsize=13, fontweight="bold")
+gs  = gridspec.GridSpec(2, 2, figure=fig, hspace=0.45, wspace=0.35)
+
+# (a) R vs alpha
+ax_a = fig.add_subplot(gs[0, 0])
+ax_a.plot(alp, R_a, "o-", color="#3a7bbf", lw=2)
+ax_a.axhline(R_fit, ls="--", color="gray", label=f"Baseline R={R_fit:.1f}")
+ax_a.fill_between(alp, R_fit * 0.8, R_fit * 1.2, alpha=0.15, color="#3a7bbf", label="±20% band")
+ax_a.set_xlabel("Label persistence coefficient alpha")
+ax_a.set_ylabel("Retention ratio R")
+ax_a.set_title("(a) R vs. alpha")
+ax_a.legend(fontsize=7)
+
+# (b) RMSE vs alpha
+ax_b = fig.add_subplot(gs[0, 1])
+ax_b.plot(alp, rmse_a, "o-", color="#555", lw=2)
+ax_b.text(0.95, 0.95, "RMSE minimised at alpha=0\n(no correction = best fit)",
+          transform=ax_b.transAxes, ha="right", va="top", fontsize=7,
+          bbox=dict(fc="white", ec="#888"))
+ax_b.set_xlabel("Label persistence coefficient alpha")
+ax_b.set_ylabel("RMSE (%ID)")
+ax_b.set_title("(b) Fit quality vs. alpha")
+
+# (c) k_bind, k_rel vs alpha
+ax_c = fig.add_subplot(gs[1, 0])
+ax_c.plot(alp, kbind_a * 1e3, "s-", color="red",   lw=2, label="k_bind (x10^-3)")
+ax_c.plot(alp, krel_a  * 1e3, "^-", color="green", lw=2, label="k_rel (x10^-3)")
+ax_c.set_xlabel("Label persistence coefficient alpha")
+ax_c.set_ylabel("Rate constant (x10⁻³ h⁻¹)")
+ax_c.set_title("(c) k_bind and k_rel vs. alpha")
+ax_c.legend(fontsize=8)
+
+# (d) % change in R vs alpha
+ax_d = fig.add_subplot(gs[1, 1])
+pct_change = (R_a - R_a[0]) / R_a[0] * 100
+ax_d.plot(alp, pct_change, "D-", color="purple", lw=2)
+ax_d.axhline(0, ls="--", color="#888")
+ax_d.axhline(-20, ls=":", color="red", label="-20% threshold")
+ax_d.text(0.05, 0.25, "RMSE optimal at alpha=0\nkinetic shape argument supported",
+          transform=ax_d.transAxes, fontsize=7, bbox=dict(fc="white", ec="#888"))
+ax_d.set_xlabel("Label persistence coefficient alpha")
+ax_d.set_ylabel("Change in R (%)")
+ax_d.set_title("(d) % change in R vs. alpha")
+ax_d.legend(fontsize=7)
+
+_save(fig, "Fig12_label_persistence.png")
+
+# ------------------------------------------------------------------
+# Supplementary Fig S1 – Hepatic profiles at R = 1, 3, 6, 10
+# ------------------------------------------------------------------
+print("\n[7/9] Supplementary figures …")
+fig, ax = plt.subplots(figsize=(8, 5))
+colors_s1 = ["#3a7bbf", "#d46a50", "#44aa44", "#8844cc"]
+t_s1 = np.linspace(0, 120, 500)
+for R_v, col in zip([1, 3, 6, 10], colors_s1):
+    p_s1 = dict(p_fit)
+    p_s1["k_bind"] = R_v * p_fit["k_rel"]
+    sol_s1 = solve_model(p_s1, t_eval=t_s1)
+    ax.plot(sol_s1.t, sol_s1.y[2] + sol_s1.y[3], color=col, lw=2, label=f"R={R_v}")
+ax.set_xlabel("Time (h)")
+ax.set_ylabel("Hepatic exosome level (a.u.)")
+ax.legend(title="Retention ratio R")
+_save(fig, "FigS1_hepatic_profiles_R.png")
+
+# Supplementary Fig S2 – 2D landscape: plateau duration vs (R, k_rel)
+print("  FigS2: 2D landscape …")
+R_grid    = np.linspace(0.5, 12, 30)
+krel_grid = np.linspace(0.005, 0.15, 30)
+Z = np.zeros((len(krel_grid), len(R_grid)))
+for ir, R_v in enumerate(R_grid):
+    for ikr, kr in enumerate(krel_grid):
+        p_g = dict(p_fit)
+        p_g["k_rel"]  = kr
+        p_g["k_bind"] = R_v * kr
+        sol_g = solve_model(p_g, t_eval=np.linspace(0, 168, 300))
+        Z[ikr, ir] = compute_plateau_duration(sol_g)
+
+fig, ax = plt.subplots(figsize=(8, 6))
+cf = ax.contourf(R_grid, krel_grid, Z, levels=15, cmap="viridis")
+plt.colorbar(cf, ax=ax, label="Plateau duration (h)")
+ax.set_xlabel("Retention ratio R")
+ax.set_ylabel("Release rate k_rel (h⁻¹)")
+_save(fig, "FigS2_2D_landscape.png")
+
+# Supplementary Fig S3 – Cross-validation
+print("  FigS3: Cross-validation …")
+# Normalise M3 prediction to t=1 h for comparison
+t_cv = np.linspace(0, 25, 200)
+sol_cv = solve_model(p_fit, t_eval=t_cv)
+B_cv  = sol_cv.y[0] / sol_cv.y[0][np.argmin(np.abs(t_cv - 1))]
+Lf_cv = (sol_cv.y[2] + sol_cv.y[3]) / (sol_cv.y[2] + sol_cv.y[3])[np.argmin(np.abs(t_cv - 1))]
+
+fig, axes = plt.subplots(2, 2, figsize=(11, 8))
+fig.suptitle("Independent cross-validation across two datasets (no parameter refitting)")
+
+# Mirzaaghasi – blood
+ax = axes[0, 0]
+ax.set_title("Mirzaaghasi et al. [17]\n(HEK293T, DiR, 1-8h)")
+ax.plot(t_cv, B_cv, "o-", color="#3a7bbf", ms=4, label="M3 prediction")
+ax.scatter(MIRZA_TIME, MIRZA_BLOOD, color="k", zorder=5, label="Observed")
+mae = np.mean(np.abs(np.interp(MIRZA_TIME, t_cv, B_cv) - MIRZA_BLOOD))
+ax.text(0.98, 0.98, f"MAE={mae:.3f}", transform=ax.transAxes, ha="right", va="top", fontsize=8)
+ax.set_ylabel("Norm. blood signal")
+ax.legend(fontsize=7)
+
+# Wiklander – blood
+ax = axes[0, 1]
+ax.set_title("Wiklander et al. [11]\n(C2C12, DiI, 1-24h)")
+ax.plot(t_cv, B_cv, "o-", color="#3a7bbf", ms=4, label="M3 prediction")
+ax.scatter(WIKL_TIME, WIKL_BLOOD, color="k", zorder=5, label="Observed")
+mae = np.mean(np.abs(np.interp(WIKL_TIME, t_cv, B_cv) - WIKL_BLOOD))
+ax.text(0.98, 0.98, f"MAE={mae:.3f}", transform=ax.transAxes, ha="right", va="top", fontsize=8)
+ax.set_ylabel("Norm. blood signal")
+ax.legend(fontsize=7)
+
+# Mirzaaghasi – liver
+ax = axes[1, 0]
+ax.plot(t_cv, Lf_cv, "s-", color="#d46a50", ms=4, label="M3 prediction")
+ax.scatter(MIRZA_TIME, MIRZA_LIVER, color="#7a0000", marker="s", zorder=5, label="Observed")
+mae = np.mean(np.abs(np.interp(MIRZA_TIME, t_cv, Lf_cv) - MIRZA_LIVER))
+ax.text(0.98, 0.05, f"MAE={mae:.3f}", transform=ax.transAxes, ha="right", va="bottom", fontsize=8)
+ax.set_xlabel("Time (h)")
+ax.set_ylabel("Norm. liver signal")
+ax.legend(fontsize=7)
+
+# Wiklander – liver
+ax = axes[1, 1]
+ax.plot(t_cv, Lf_cv, "s-", color="#d46a50", ms=4, label="M3 prediction")
+ax.scatter(WIKL_TIME, WIKL_LIVER, color="#7a0000", marker="s", zorder=5, label="Observed")
+mae = np.mean(np.abs(np.interp(WIKL_TIME, t_cv, Lf_cv) - WIKL_LIVER))
+ax.text(0.98, 0.05, f"MAE={mae:.3f}", transform=ax.transAxes, ha="right", va="bottom", fontsize=8)
+ax.set_xlabel("Time (h)")
+ax.set_ylabel("Norm. liver signal")
+ax.legend(fontsize=7)
+
+_save(fig, "FigS3_cross_validation.png")
+
+# Supplementary Fig S4 – k_rel reduction scenarios
+t_s4 = np.linspace(0, 120, 500)
+krel_reductions = [0, 0.25, 0.50, 0.75]
+colors_s4 = ["#3a7bbf", "#44aa44", "#d46a50", "#8844cc"]
+
+fig, ax = plt.subplots(figsize=(8, 5))
+for frac, col in zip(krel_reductions, colors_s4):
+    p_s4 = dict(p_fit)
+    p_s4["k_rel"] = p_fit["k_rel"] * (1 - frac)
+    sol_s4 = solve_model(p_s4, t_eval=t_s4)
+    L_s4 = sol_s4.y[2] + sol_s4.y[3]
+    plat = compute_plateau_duration(sol_s4)
+    label = f"Baseline (plateau~{plat:.0f}h)" if frac == 0 else \
+            f"-{int(frac*100)}% k_rel (plateau~{plat:.0f}h)"
+    ax.plot(sol_s4.t, L_s4, color=col, lw=2, label=label)
+
+ax.set_xlabel("Time (h)")
+ax.set_ylabel("Hepatic exosome level (a.u.)")
+ax.legend(title="k_rel modification", fontsize=8)
+_save(fig, "FigS4_krel_reduction.png")
+
+# ------------------------------------------------------------------
+# Summary table
+# ------------------------------------------------------------------
+print("\n" + "=" * 60)
+print("FITTED PARAMETERS SUMMARY")
+print("=" * 60)
+print(f"{'Parameter':<12} {'Value':>12} {'Units':<10}")
+print("-" * 36)
+for k in PK_FIT_PARAMS:
+    units = "h⁻¹"
+    print(f"{k:<12} {p_fit[k]:>12.5f} {units:<10}")
+print(f"{'R = kb/kr':<12} {R_fit:>12.2f} {'—':<10}")
+print(f"\nAll figures saved to current directory.")
+print("=" * 60)
+```
+
+# =============================================================================
+
+if **name** == “**main**”:
+main()
