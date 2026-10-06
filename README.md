@@ -1,11 +1,5 @@
 # Exosome Retention PK Model
 
-[![DOI](https://img.shields.io/badge/Preprint‑10.21203%2Frs.3.rs‑7939584%2Fv1‑informational)](https://doi.org/10.21203/rs.3.rs-7939584/v1)
-[![License](https://img.shields.io/badge/license‑MIT‑green)](LICENSE)
-[![Python](https://img.shields.io/badge/python‑3.x‑blue)](https://www.python.org/)
-[![Status](https://img.shields.io/badge/status‑research_prototype‑orange)](https://github.com/alexshen2468-ai/exosome-retention-pk-model)
-[![ORCID](https://img.shields.io/badge/ORCID‑0009‑0005‑4304‑8391‑brightgreen)](https://orcid.org/0009-0005-4304-8391)
-
 Mechanistic multi‑scale pharmacokinetic model for exosome biodistribution and hepatic retention. Introduces the dimensionless **retention ratio $R = k_{\text{bind}} / k_{\text{rel}}$** as a compact, biologically interpretable design parameter for exosome‑based drug delivery.
 Model developed following ISEV extracellular vesicle research standards.
 
