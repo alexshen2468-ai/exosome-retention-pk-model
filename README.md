@@ -1,12 +1,10 @@
 # exosome-retention-pk-model
 
-https://orcid.org/0009-0005-4304-8391
-
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.xxxxxx.svg)](https://doi.org/10.5281/zenodo.xxxxxx)
 [![Preprint](https://img.shields.io/badge/Research_Square-rs.3.rs--7939584/v1-blue)](https://doi.org/10.21203/rs.3.rs-7939584/v1)
 
-A Mechanistic Quantitative Systems Pharmacology (QSP) and Non-Linear Phase-Space Control Framework for Engineered Exosome Biodistribution & Retention PK/PD Dynamics.
+A Quantitative Systems Pharmacology (QSP) and Non-Linear Phase-Space Control Framework for Engineered Exosome Biodistribution & Retention PK/PD Dynamics.
 
 ---
 
@@ -21,36 +19,22 @@ Key capabilities include:
 
 ---
 
-## 🛠️ Installation & Requirements
+## 🛠️ Quick Start
 
-Ensure you have Python 3.9+ installed. Clone the repository and install dependencies:
-
+### 1. Installation
 ```bash
 git clone [https://github.com/alexshen2468-ai/exosome-retention-pk-model.git](https://github.com/alexshen2468-ai/exosome-retention-pk-model.git)
 cd exosome-retention-pk-model
 pip install -r requirements.txt
 
-Key Dependencies
- ⁠numpy >= 1.21.0⁠
- ⁠scipy >= 1.7.0⁠ (SLSQP, ⁠solve_ivp⁠)
- ⁠matplotlib >= 3.4.0⁠
- ⁠torch >= 1.9.0⁠ (Optional: for PINNs formulation)
-🚀 Usage & Quick Start
-1. Run Baseline Phase-Space Simulation
-python scripts/run_phase_space_simulation.py --mode triple_channel
-2. Dosing Schedule Optimization
-python scripts/optimize_dosing_slsqp.py --target_efficiency 0.95
+2. Run Simulations & Optimization
+# Run baseline phase-space dynamic simulation
+python run_phase_space_simulation.py
 
-📑 Citation & References
+# Run SLSQP optimal dosing profile computation
+python optimize_dosing_slsqp.py
+
+📑 Citation
 If you use this model or codebase in your research, please cite our preprint:
+
 Shen, Z. Algorithmization of Mesoscopic Bio-Assembly Informed by Room-Temperature Superconductivity Physics / Shen's Three Laws of Biological Phase-Space Control. Research Square (2026). DOI: 10.21203/rs.3.rs-7939584/v1
-
-@article{shen2026exosome,
-  title={Exosome retention PK model and non-linear phase-space control repository},
-  author={Shen, Zhuofan},
-  journal={Research Square Preprint},
-  year={2026},
-  doi={10.21203/rs.3.rs-7939584/v1}
-}
-
-
