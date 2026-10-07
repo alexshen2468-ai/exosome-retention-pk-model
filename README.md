@@ -1,7 +1,7 @@
 # exosome-retention-pk-model
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.xxxxxx.svg)](https://doi.org/10.5281/zenodo.xxxxxx)
+
 [![Preprint](https://img.shields.io/badge/Research_Square-rs.3.rs--7939584/v1-blue)](https://doi.org/10.21203/rs.3.rs-7939584/v1)
 
 A Mechanistic Quantitative Systems Pharmacology (QSP) and Non-Linear Phase-Space Control Framework for Engineered Exosome Biodistribution & Retention PK/PD Dynamics.
