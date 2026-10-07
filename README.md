@@ -34,7 +34,9 @@ python run_phase_space_simulation.py
 # Run SLSQP optimal dosing profile computation
 python optimize_dosing_slsqp.py
 
+
 📑 Citation
 If you use this model or codebase in your research, please cite our preprint:
 
 Shen, Z. Algorithmization of Mesoscopic Bio-Assembly Informed by Room-Temperature Superconductivity Physics / Shen's Three Laws of Biological Phase-Space Control. Research Square (2026). DOI: 10.21203/rs.3.rs-7939584/v1
+
