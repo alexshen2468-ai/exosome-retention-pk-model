@@ -1,5 +1,7 @@
 # exosome-retention-pk-model
 
+https://orcid.org/0009-0005-4304-8391
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 [![Preprint](https://img.shields.io/badge/Research_Square-rs.3.rs--7939584/v1-blue)](https://doi.org/10.21203/rs.3.rs-7939584/v1)
