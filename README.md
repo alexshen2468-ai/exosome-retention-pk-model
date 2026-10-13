@@ -147,8 +147,6 @@ SALib
 
 ## 🚀 Quick Start
 
-> 注意：以下示例中的模块名与函数名请根据仓库实际代码调整。
-
 ### 1. Run an ALS phase-space simulation
 
 ```python
@@ -213,7 +211,7 @@ exosome-retention-pk-model/
     └── ...
 ```
 
-> `.gitignore` 已配置 Python 常用忽略规则（`__pycache__/`、`.venv/`、`.ipynb_checkpoints/`、`.env` 等），无需手动删除缓存文件。
+> `.gitignore`  Python （`__pycache__/`、`.venv/`、`.ipynb_checkpoints/`、`.env` 
 
 ---
 
