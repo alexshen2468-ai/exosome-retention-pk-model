@@ -9,7 +9,7 @@
 
 ## 🧬 About Me
 
-I am **Zhuofan (Kangzhou) Shen**, an undergraduate researcher in **Bioengineering** at **UIC Barcelona** and a **Junior Member of the International Society for Extracellular Vesicles (ISEV, 2026–2028)**. Previously, I studied biotechnology at the **University of Debrecen**.
+I am **Zhuofan (Kangzhou) Shen**, an undergraduate student in **Bioengineering** at **UIC Barcelona** and a **Junior Member of the International Society for Extracellular Vesicles (ISEV, 2026–2028)**.
 
 My research focuses on:
 
